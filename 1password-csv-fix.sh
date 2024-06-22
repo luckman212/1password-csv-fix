@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 
+# on Linux, you may need to manually register the URI handler:
+# xdg-mime default 1password.desktop x-scheme-handler/onepassword
+# ref: https://nick.groenen.me/notes/fixing-the-1password-for-linux-url-scheme-handler
+
+# on Windows/WSL you may need to install xdg-utils
+# sudo apt-get update
+# sudo apt install xdg-utils
+
 #prereqs
 for c in jq op fzf ; do
   if ! hash $c &>/dev/null; then echo "requirement missing: $c"; exit 1; fi
@@ -91,10 +99,16 @@ _getAllUrls() {
 }
 
 _op() {
+	local URI
 	_authorize
 	i=$1
+	URI="onepassword://$action/?a=$a&v=$v&i=$i"
 	#open "https://start.1password.com/open/i?a=$a&h=$h&i=$i&v=$v"
-	open "onepassword://$action/?a=$a&v=$v&i=$i"
+	case $MACHTYPE in
+		*darwin*) open "$URI";;
+		*linux*) xdg-open "$URI";;
+		*) echo "unsupported platform";;
+	esac
 }
 
 _all() {
@@ -163,19 +177,25 @@ _fix() {
 
 _longurls() {
 	_getAllItems |
-	jq --raw-output 'map(select((.urls[]?.href | test(","))))[] |
+	jq --raw-output '
+	def col($len):
+		tostring | . + (" " * $len) | .[:$len];
+	map(select((.urls[]?.href | test(","))))[] |
 	[ .id, (.title|col(25)), .urls[0].href ] | @tsv'
 }
 
 _allitems_raw() {
 	_getAllItems |
-	jq --raw-output '.[] | [
+	jq --raw-output '
+	def col($len):
+		tostring | . + (" " * $len) | .[:$len];
+	.[] | [
 		.id,
 		(.title|col(25)),
 		(if .urls[0].href
 			then .urls[0].href|split(",")[0]
 			else "-" end)
-		] | @tsv'
+	] | @tsv'
 }
 
 _uiAction() {
