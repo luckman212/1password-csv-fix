@@ -19,7 +19,8 @@ FR=$(printf '\x01\e[1;31m\x02')
 FG=$(printf '\x01\e[1;32m\x02')
 GC="${FG}✔${FN}"
 RX="${FR}✘${FN}"
-TEMP_DIR='/tmp'
+TEMP_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+OPEN_AFTER_FIX=true
 FZF_OPTS=(
 	--exact
 	--no-mouse
@@ -28,6 +29,9 @@ FZF_OPTS=(
 	--bind='ctrl-a:select-all,ctrl-s:deselect-all'
 	--exit-0
 )
+
+#check that we can write to TEMP_DIR
+[[ -w $TEMP_DIR ]] || { echo "\$TEMP_DIR \`$TEMP_DIR\` is not writeable, check permissions or specify a different path"; exit 1; }
 
 _usage() {
 	cat <<-EOF
@@ -167,7 +171,7 @@ _fix() {
 		else
 			echo "$1 ${GC}"
 			rm "$f"
-			if [[ $MULTI != true ]]; then
+			if [[ $MULTI != true ]] && [[ $OPEN_AFTER_FIX == true ]]; then
 				action='view-item'
 				_op "$1"
 			fi
@@ -201,7 +205,7 @@ _allitems_raw() {
 _uiAction() {
 	if [[ -n $1 ]]; then
 		if [[ $1 == 'last' ]] && [[ -e $TEMP_DIR/1p-mru ]]; then
-			_op "$(<$TEMP_DIR/1p-mru)"
+			_op "$(<"$TEMP_DIR/1p-mru")"
 		else
 			_op "$1"
 		fi
@@ -289,7 +293,7 @@ case $1 in
 				fi
 			fi
 		done 3< <(_allitems_raw | fzf "${FZF_OPTS[@]}" --multi --header "DELETE FIELD: ${FIELD_TO_DELETE}")
-		if (( c == 1 )); then
+		if (( c == 1 )) && [[ $OPEN_AFTER_FIX == true ]]; then
 			action='view-item'
 			_op "$LAST"
 		fi
